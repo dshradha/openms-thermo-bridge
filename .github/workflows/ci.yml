@@ -25,7 +25,7 @@ jobs:
       # ── 3. Build & publish the managed C# library ─────────────────────────
       - name: Restore & publish ThermoWrapperManaged
         run: |
-          dotnet publish ThermoWrapperManaged/ThermoWrapperManaged.csproj \
+          dotnet publish ThermoWrapperManaged.csproj \
             -c Release \
             -r linux-x64 \
             --self-contained false \
@@ -37,10 +37,6 @@ jobs:
           ls -lh publish/ThermoWrapperManaged.runtimeconfig.json
 
       # ── 4. Locate the .NET hosting headers & libnethost ───────────────────
-      #   setup-dotnet installs the SDK under $DOTNET_ROOT.
-      #   The native host pack is in:
-      #     $DOTNET_ROOT/packs/Microsoft.NETCore.App.Host.linux-x64/<ver>/
-      #                       runtimes/linux-x64/native/
       - name: Locate nethost headers and library
         id: nethost
         run: |
@@ -59,7 +55,7 @@ jobs:
           g++ -std=c++17 \
             -I"$NATIVE_DIR" \
             -L"$NATIVE_DIR" \
-            thermo_host.cpp \
+            ThermoWrapper.cpp \
             -o thermo_host \
             -lnethost -ldl \
             "-Wl,-rpath,$NATIVE_DIR" \
@@ -71,10 +67,6 @@ jobs:
           ldd thermo_host
 
       # ── 6. Smoke test – no real .raw file needed ──────────────────────────
-      #   Without a real file the host should exit non-zero and print a clear
-      #   error message.  We test two things:
-      #     a) missing argument → usage line on stderr
-      #     b) non-existent file → managed code returns -1 or -2 (not a crash)
       - name: Smoke test – no arguments (usage message)
         run: |
           set +e
@@ -91,12 +83,10 @@ jobs:
           EXIT=$?
           echo "exit=$EXIT"
           echo "output: $OUTPUT"
-          # Must NOT be killed by a signal (139 = SIGSEGV, 134 = SIGABRT, etc.)
           if [ $EXIT -ge 128 ]; then
             echo "❌ Process crashed with signal exit code $EXIT"
             exit 1
           fi
-          # Scan count must be negative (error sentinel), not a wild positive number
           SCAN_LINE=$(echo "$OUTPUT" | grep -i "scan count" || true)
           if [ -n "$SCAN_LINE" ]; then
             COUNT=$(echo "$SCAN_LINE" | grep -oE '\-?[0-9]+')
@@ -109,18 +99,7 @@ jobs:
             echo "✓ No scan count printed (file not opened)"
           fi
 
-      # ── 7. (Optional) Integration test with a real .raw file ──────────────
-      #   Upload a small .raw fixture to the repo (e.g. tests/fixtures/mini.raw)
-      #   and un-comment this step.
-      #
-      # - name: Integration test – real .raw file
-      #   run: |
-      #     OUTPUT=$(./thermo_host tests/fixtures/mini.raw 2>&1)
-      #     echo "$OUTPUT"
-      #     echo "$OUTPUT" | grep -E "^Scan count: [1-9][0-9]*"
-      #     echo "✓ Positive scan count returned"
-
-      # ── 8. Upload artifacts for inspection ───────────────────────────────
+      # ── 7. Upload artifacts for inspection ───────────────────────────────
       - name: Upload build artifacts
         if: always()
         uses: actions/upload-artifact@v4
