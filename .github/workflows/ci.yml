@@ -25,11 +25,21 @@ jobs:
       # ── 3. Build & publish the managed C# library ─────────────────────────
       - name: Restore & publish ThermoWrapperManaged
         run: |
+          dotnet nuget add source https://www.nuget.org/api/v2 --name nuget-v2 || true
+          dotnet nuget add source https://github.com/thermofisherlsms/RawFileReader \
+            --name thermo || true
           dotnet publish ThermoWrapperManaged.csproj \
             -c Release \
             -r linux-x64 \
             --self-contained false \
             -o publish
+```
+
+Save, close, then push:
+```
+git add .
+git commit -m "Add ThermoFisher NuGet source to CI"
+git push
 
       - name: Verify managed artifacts exist
         run: |
